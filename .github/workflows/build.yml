@@ -40,7 +40,7 @@ jobs:
           file "${BIN}"
           chmod +x Scripts/package-app.sh
           Scripts/package-app.sh "${BIN}"
-          test -d dist/ThinkDial.app/Contents/MacOS/ThinkDial
+          test -x dist/ThinkDial.app/Contents/MacOS/ThinkDial
           test -f dist/ThinkDial.app/Contents/Info.plist
           echo "CFBundleIdentifier=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' dist/ThinkDial.app/Contents/Info.plist)"
           echo "LSUIElement=$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' dist/ThinkDial.app/Contents/Info.plist)"
