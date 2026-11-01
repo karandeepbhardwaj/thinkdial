@@ -1,0 +1,12 @@
+.DS_Store
+.build/
+build/
+dist/
+.swiftpm/
+*.xcodeproj
+xcuserdata/
+*.xcuserstate
+DerivedData/
+*.bundle
+.cursor/
+agent-tools/

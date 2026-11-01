@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ThinkDial popover mock</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #1e1e20;
+    --card: rgba(255,255,255,0.04);
+    --line: rgba(255,255,255,0.10);
+    --text: #f5f5f7;
+    --dim: #98989d;
+    --orange: #ff9f0a;
+    --blue: #0a84ff;
+    --fill: #3a3a3c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0e0e10; color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .stage { width: 420px; margin: 0 auto; padding: 18px 18px 0; }
+  .menubar {
+    height: 28px; display: flex; align-items: center; justify-content: flex-end; gap: 16px;
+    color: #f2f2f2; font-size: 13px; padding: 0 8px 10px;
+  }
+  .status-icon {
+    width: 28px; height: 22px; border-radius: 6px; display: grid; place-items: center;
+    background: rgba(255,255,255,0.16);
+  }
+  .popover {
+    width: 360px; margin: 0 auto; background: var(--bg);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 14px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+    overflow: hidden;
+  }
+  .header, .body, .footer { padding: 14px; }
+  .header { display: flex; gap: 10px; align-items: center; border-bottom: 1px solid var(--line); }
+  .mark {
+    width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center;
+    background: rgba(10,132,255,0.16); color: var(--blue); font-size: 18px;
+  }
+  h1 { font-size: 14px; margin: 0; font-weight: 650; }
+  .sub { color: var(--dim); font-size: 11px; margin-top: 2px; }
+  .demo {
+    margin-left: auto; font-size: 10px; font-weight: 700; color: var(--orange);
+    background: rgba(255,159,10,0.18); border-radius: 999px; padding: 3px 7px;
+  }
+  .note {
+    font-size: 11px; color: var(--dim); background: rgba(255,159,10,0.12);
+    border-radius: 8px; padding: 8px; margin-bottom: 12px; line-height: 1.35;
+  }
+  .row { margin-bottom: 12px; }
+  .label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+  .label span:last-child, .value { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 650; }
+  .raw { font-size: 10px; color: var(--dim); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; margin: 6px 0 0; accent-color: #fff; }
+  .volume { display: flex; gap: 8px; align-items: center; }
+  .volume .row { flex: 1; margin: 0; }
+  .mute {
+    width: 32px; height: 28px; border-radius: 6px; border: 1px solid var(--line);
+    display: grid; place-items: center; color: var(--text); font-size: 13px;
+  }
+  .picker, .inputs, .profile, .power {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .picker { font-size: 13px; margin: 4px 0; }
+  .chip {
+    margin-left: auto; background: var(--fill); border-radius: 6px; padding: 3px 8px; font-size: 12px;
+  }
+  .hint { font-size: 10px; color: var(--dim); line-height: 1.35; margin-top: 4px; }
+  .section { font-size: 13px; font-weight: 600; margin: 8px 0 6px; }
+  .inputs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  button.choice, .power button, .profile {
+    background: var(--fill); color: var(--text); border: 0; border-radius: 7px;
+    padding: 6px 8px; font-size: 11px; font-weight: 600;
+  }
+  button.choice.off { color: var(--dim); }
+  .power button { width: 100%; padding: 8px; font-size: 13px; }
+  .profile { display: inline-flex; }
+  .footer {
+    border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: center;
+    color: var(--dim); font-size: 14px;
+  }
+  .footer .spacer { margin-left: auto; }
+  .caption { margin: 14px auto 0; max-width: 360px; color: #8e8e93; font-size: 12px; line-height: 1.4; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="menubar">
+      <span>Sat 31 Oct &nbsp; 23:55</span>
+      <div class="status-icon" title="ThinkDial">◎</div>
+    </div>
+    <div class="popover">
+      <div class="header">
+        <div class="mark">◎</div>
+        <div>
+          <h1>ThinkVision P34WD-40</h1>
+          <div class="sub">Simulated USB-C</div>
+        </div>
+        <div class="demo">Demo</div>
+      </div>
+      <div class="body">
+        <div class="note">Demo mode is a simulated P34WD-40. Nothing here was read from a real monitor.</div>
+        <div class="row">
+          <div class="label">☀ Brightness <span class="value">40</span></div>
+          <input type="range" min="0" max="100" value="40">
+          <div class="raw">Raw 40 of 100</div>
+        </div>
+        <div class="row">
+          <div class="label">◐ Contrast <span class="value">70</span></div>
+          <input type="range" min="0" max="100" value="70">
+          <div class="raw">Raw 70 of 100</div>
+        </div>
+        <div class="volume">
+          <div class="row">
+            <div class="label">🔊 Volume <span class="value">20</span></div>
+            <input type="range" min="0" max="100" value="20">
+            <div class="raw">Raw 20 of 100</div>
+          </div>
+          <div class="mute">♪</div>
+        </div>
+        <div class="picker" style="margin-top:12px">Colour <span class="chip">6500 K</span></div>
+        <div class="hint">VCP 0x14 names are from MCCS. This panel may only accept some of them.</div>
+        <div class="section">Red, green, blue gain</div>
+        <div class="row"><div class="label">Red <span>50</span></div><input type="range" value="50"></div>
+        <div class="row"><div class="label">Green <span>50</span></div><input type="range" value="50"></div>
+        <div class="row"><div class="label">Blue <span>50</span></div><input type="range" value="50"></div>
+        <div class="section">Input</div>
+        <div class="inputs">
+          <button class="choice off">USB-C —</button>
+          <button class="choice">DisplayPort 0x0F</button>
+          <button class="choice">HDMI 0x11</button>
+        </div>
+        <div class="hint">DisplayPort starts at MCCS 0x0F and HDMI at 0x11. USB-C has no default. None of these are confirmed on the P34WD-40.</div>
+        <div style="margin-top:12px"><span class="profile">▤ Profile</span></div>
+        <div class="power" style="margin-top:10px"><button>⏻ Turn display off</button></div>
+      </div>
+      <div class="footer">
+        <span>⌁</span><span>▣</span><span>⇄</span>
+        <span class="spacer">⚙</span><span>↻</span>
+      </div>
+    </div>
+    <p class="caption">Design mock of the menu-bar popover in demo mode. Not a screenshot of the macOS app.</p>
+  </div>
+</body>
+</html>
