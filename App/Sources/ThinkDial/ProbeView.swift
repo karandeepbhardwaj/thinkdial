@@ -160,7 +160,7 @@ struct ProbeView: View {
             capabilities = text
             status = "Capabilities string received. It is not a published Lenovo list."
         } else {
-            status = "No capabilities string. That is common — the VCP scan can still run."
+            status = "No capabilities string. AppleSiliconDDC only exposes get and set VCP, so discovery on Apple Silicon is the scan below. An Intel Mac also tries a framebuffer I2C read."
         }
         persist()
     }

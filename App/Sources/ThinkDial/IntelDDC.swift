@@ -1,19 +1,17 @@
 import CoreGraphics
 import Foundation
-import IOKit
-import IOKit.i2c
 import ThinkDialCore
+import ThinkDialI2C
 
-/// Best-effort DDC/CI over IOFramebuffer I2C for Intel Macs.
-/// Apple Silicon uses AppleSiliconDDC instead. This file still typechecks on arm64 so the
-/// fallback is not an unbuilt `#if`. It follows the public IOKit transaction shape, not a
-/// copied MonitorControl source file. Nothing here is verified on a P34WD-40.
+/// Intel DDC/CI over the public IOFramebuffer I2C interface.
+/// The IOI2CRequest struct is filled in ThinkDialI2C.c. This file only matches displays.
+/// Apple Silicon uses AppleSiliconDDC instead. Nothing here is verified on a P34WD-40.
 final class IntelDDC: @unchecked Sendable {
-    private var framebuffers: [String: io_service_t] = [:]
+    private var framebuffers: [String: UInt32] = [:]
 
     deinit {
         for service in framebuffers.values where service != 0 {
-            IOObjectRelease(service)
+            TDReleaseService(service)
         }
     }
 
@@ -27,15 +25,16 @@ final class IntelDDC: @unchecked Sendable {
             let vendorNumber = CGDisplayVendorNumber(displayID)
             let model = CGDisplayModelNumber(displayID)
             let serial = CGDisplaySerialNumber(displayID)
+            let unit = CGDisplayUnitNumber(displayID)
             let vendor = EDIDVendor.pnpID(vendorNumber)
-            let builtin = CGDisplayIsBuiltin(displayID)
-            let matched = framebuffer(for: displayID, vendor: vendorNumber, model: model, serial: serial)
-            let product = matched.flatMap { productName(of: $0) } ?? ""
+            let builtin = TDDisplayIsBuiltin(displayID) != 0
+            let matched: UInt32 = builtin ? 0 : TDCopyFramebuffer(vendorNumber, model, serial, unit)
+            let product = productName(of: matched)
             let title = product.isEmpty ? "\(vendor) \(model)" : product
-            let id = DisplayID("cg:\(vendor):\(model):\(serial):\(CGDisplayUnitNumber(displayID))")
-            if let matched {
+            let id = DisplayID("cg:\(vendor):\(model):\(serial):\(unit)")
+            if matched != 0 {
                 if let previous = framebuffers[id.raw], previous != matched {
-                    IOObjectRelease(previous)
+                    TDReleaseService(previous)
                 }
                 framebuffers[id.raw] = matched
             }
@@ -47,7 +46,7 @@ final class IntelDDC: @unchecked Sendable {
                 serialNumber: serial == 0 ? "" : String(serial),
                 transport: "I2C (Intel fallback)",
                 isBuiltIn: builtin,
-                ddcAvailable: !builtin && matched != nil
+                ddcAvailable: !builtin && matched != 0
             )
         }
     }
@@ -106,100 +105,27 @@ final class IntelDDC: @unchecked Sendable {
         return data
     }
 
-    /// Nil means the transaction failed. An empty array means a write with no reply was accepted.
+    /// Nil means the bus rejected the packet. An empty array is a write that was accepted.
     private func transact(display: DisplayID, send: [UInt8], replyCount: Int) -> [UInt8]? {
-        guard let framebuffer = framebuffers[display.raw] else { return nil }
-        var busCount: IOItemCount = 0
-        guard IOFBGetI2CInterfaceCount(framebuffer, &busCount) == KERN_SUCCESS, busCount > 0 else { return nil }
-        for bus in 0..<busCount {
-            var interface: io_service_t = 0
-            guard IOFBCopyI2CInterfaceForBus(framebuffer, IOOptionBits(bus), &interface) == KERN_SUCCESS, interface != 0 else {
-                continue
+        guard let framebuffer = framebuffers[display.raw], framebuffer != 0 else { return nil }
+        var reply = [UInt8](repeating: 0, count: max(0, replyCount))
+        let status: Int32 = send.withUnsafeBufferPointer { sendBuffer in
+            guard let sendBase = sendBuffer.baseAddress else { return 1 }
+            if replyCount == 0 {
+                return TDFramebufferDDC(framebuffer, sendBase, UInt32(send.count), nil, 0)
             }
-            defer { IOObjectRelease(interface) }
-            var connect: IOI2CConnectRef?
-            guard IOI2CInterfaceOpen(interface, 0, &connect) == KERN_SUCCESS, let connect else { continue }
-            defer { IOI2CInterfaceClose(connect, 0) }
-
-            var sendBytes = send
-            var replyBytes = [UInt8](repeating: 0, count: replyCount)
-            let accepted: Bool = sendBytes.withUnsafeMutableBytes { sendRaw in
-                replyBytes.withUnsafeMutableBytes { replyRaw in
-                    var request = IOI2CRequest()
-                    request.commFlags = 0
-                    request.sendAddress = 0x6E
-                    request.sendTransactionType = IOOptionBits(kIOI2CSimpleTransactionType)
-                    request.sendBuffer = vm_address_t(bitPattern: sendRaw.baseAddress)
-                    request.sendBytes = UInt32(send.count)
-                    request.minReplyDelay = 10
-                    if replyCount == 0 {
-                        request.replyTransactionType = IOOptionBits(kIOI2CNoTransactionType)
-                        request.replyBytes = 0
-                    } else {
-                        request.replyAddress = 0x6F
-                        request.replySubAddress = 0x51
-                        request.replyTransactionType = IOOptionBits(kIOI2CDDCciReplyTransactionType)
-                        request.replyBuffer = vm_address_t(bitPattern: replyRaw.baseAddress)
-                        request.replyBytes = UInt32(replyCount)
-                    }
-                    let result = IOI2CSendRequest(connect, 0, &request)
-                    return result == KERN_SUCCESS && request.result == KERN_SUCCESS
-                }
-            }
-            if accepted {
-                return replyCount == 0 ? [] : replyBytes
+            return reply.withUnsafeMutableBufferPointer { replyBuffer in
+                TDFramebufferDDC(framebuffer, sendBase, UInt32(send.count), replyBuffer.baseAddress, UInt32(replyCount))
             }
         }
-        return nil
+        guard status == 0 else { return nil }
+        return replyCount == 0 ? [] : reply
     }
 
-    private func framebuffer(for displayID: CGDirectDisplayID, vendor: UInt32, model: UInt32, serial: UInt32) -> io_service_t? {
-        if CGDisplayIsBuiltin(displayID) { return nil }
-        var iterator: io_iterator_t = 0
-        guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOFramebuffer"), &iterator) == KERN_SUCCESS else {
-            return nil
-        }
-        defer { IOObjectRelease(iterator) }
-        while case let service = IOIteratorNext(iterator), service != 0 {
-            let info = IODisplayCreateInfoDictionary(service, IOOptionBits(kIODisplayOnlyPreferredName)).takeRetainedValue() as NSDictionary
-            let portVendor = number(kDisplayVendorID as String, in: info)
-            let portModel = number(kDisplayProductID as String, in: info)
-            let portSerial = number(kDisplaySerialNumber as String, in: info)
-            guard portVendor == vendor, portModel == model, portSerial == serial else {
-                IOObjectRelease(service)
-                continue
-            }
-            if let location = info[kIODisplayLocationKey as String] as? String,
-               let unit = unitNumber(in: location),
-               unit != CGDisplayUnitNumber(displayID) {
-                IOObjectRelease(service)
-                continue
-            }
-            var buses: IOItemCount = 0
-            guard IOFBGetI2CInterfaceCount(service, &buses) == KERN_SUCCESS, buses > 0 else {
-                IOObjectRelease(service)
-                continue
-            }
-            return service
-        }
-        return nil
-    }
-
-    private func productName(of service: io_service_t) -> String? {
-        let info = IODisplayCreateInfoDictionary(service, IOOptionBits(kIODisplayOnlyPreferredName)).takeRetainedValue() as NSDictionary
-        guard let names = info["DisplayProductName"] as? NSDictionary else { return nil }
-        if let english = names["en_US"] as? String, !english.isEmpty { return english }
-        return names.allValues.compactMap { $0 as? String }.first
-    }
-
-    private func number(_ key: String, in dictionary: NSDictionary) -> UInt32 {
-        if let value = dictionary[key] as? NSNumber { return value.uint32Value }
-        return 0
-    }
-
-    private func unitNumber(in location: String) -> UInt32? {
-        guard let at = location.lastIndex(of: "@") else { return nil }
-        let digits = location[location.index(after: at)...].prefix { $0.isNumber }
-        return UInt32(digits)
+    private func productName(of framebuffer: UInt32) -> String {
+        guard framebuffer != 0 else { return "" }
+        var bytes = [CChar](repeating: 0, count: 128)
+        guard TDCopyProductName(framebuffer, &bytes, Int32(bytes.count)) != 0 else { return "" }
+        return String(cString: bytes)
     }
 }

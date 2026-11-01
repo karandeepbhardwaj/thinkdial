@@ -29,13 +29,13 @@ Demo mode needs no monitor. Turn it on from the empty popover, or in Settings �
 ```bash
 swift test
 
-cd App
-swift build -c release
-# or
-xcodebuild -scheme ThinkDial -destination 'platform=macOS' -configuration Release build
+swift build -c release --arch arm64 --package-path App
+Scripts/package-app.sh App/.build/arm64-apple-macosx/release/ThinkDial
 ```
 
-`Scripts/package-app.sh /path/to/ThinkDial` builds `dist/ThinkDial.app`, ad-hoc signs it, and zips it. The first launch of an ad-hoc signed app may need a right-click → Open. Launch at login uses `SMAppService` and expects a real `ThinkDial.app` bundle.
+`Scripts/package-app.sh` builds `dist/ThinkDial.app` (Info.plist, `LSUIElement`, bundle id `app.thinkdial.ThinkDial`, icon), ad-hoc signs it, and zips it. The first launch of an ad-hoc signed app may need a right-click → Open. Launch at login uses `SMAppService` and expects that `.app` bundle.
+
+Opening the `App` folder in `xcodebuild` does not create a ThinkDial scheme (the synthesized workspace is named `App` and its scheme list is empty). CI prints `xcodebuild -list` so that stays visible, then builds with `swift build`.
 
 The menu-bar icon is the SF Symbol `dial.medium`. The app is an agent (`LSUIElement`), so it does not take a Dock icon. Brightness and volume keys stay with macOS until you opt in under Settings → Keys, which asks for Accessibility permission because those keys are otherwise hidden.
 
@@ -48,7 +48,7 @@ Shortcuts can set brightness, apply a profile, and switch a saved input. The int
 - Red / green / blue gain (0x16 / 0x18 / 0x1A).
 - USB-C, DisplayPort, and HDMI buttons. The values are editable.
 - Display power off writes 0xD6 = 0x05, the MCCS “turn the display off” value, after a confirmation. Waking the panel again often needs its power button.
-- A probe window: capabilities string, then getvcp for 0x00–0xFF, labels, and pinned slider / toggle / picker controls. Export and import is JSON. Writes on that screen stay off until you arm them and confirm the specific value.
+- A probe window: on Intel, a framebuffer I2C capabilities read; on Apple Silicon, getvcp for 0x00–0xFF (AppleSiliconDDC does not expose the capabilities opcode). Labels and pinned slider / toggle / picker controls. Export and import is JSON. Writes on that screen stay off until you arm them and confirm the specific value.
 - An input tester that sends one 0x60 candidate at a time, with a warning that the Mac may lose the picture and DDC with it.
 - Profiles (Coding, Movie, Night, plus ones you capture) that write several codes in order.
 - A brightness schedule by clock time, or by sunrise and sunset if you type a latitude and longitude. No location permission. The schedule waits two minutes after you move the slider.
@@ -88,12 +88,12 @@ A full probe is hundreds of slow reads. Unsupported codes simply do not answer. 
 
 `swift test` covers the code that does not touch hardware: checksums and reply parsing, the capabilities parser, probe JSON, profile ordering, the sunrise/sunset schedule, display selection (Lenovo `0x30AE` → `LEN`), input defaults, write coalescing, and retries. The mock backend is the same one demo mode uses.
 
-This repository can be tested on Linux for that core library. `xcodebuild` of the app needs macOS. GitHub Actions on `macos-latest` runs the tests, builds an arm64 Release app, ad-hoc signs a zip, uploads it as an artifact, and attaches that zip to GitHub releases for tags named `v*`.
+This repository can be tested on Linux for that core library. The menu-bar app builds on macOS. GitHub Actions on `macos-latest` runs the tests, builds an arm64 Release executable with Swift Package Manager, wraps a signed `.app`, uploads the zip, and attaches that zip to GitHub releases for tags named `v*`.
 
 ## Layout
 
 - `Sources/ThinkDialCore` — DDC types, schedules, profiles, probe documents, mock monitor
-- `App/` — SwiftUI menu-bar app, AppleSiliconDDC, Intel fallback
+- `App/` — SwiftUI menu-bar app, AppleSiliconDDC, and the Intel I2C fallback (`ThinkDialI2C`)
 - `docs/popover-mock.png` — a drawing of the popover, not a screenshot from macOS
 
 ## Third-party software

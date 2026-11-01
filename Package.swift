@@ -12,5 +12,6 @@ let package = Package(
     targets: [
         .target(name: "ThinkDialCore"),
         .testTarget(name: "ThinkDialCoreTests", dependencies: ["ThinkDialCore"])
-    ]
+    ],
+    swiftLanguageVersions: [.v5]
 )

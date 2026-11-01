@@ -19,27 +19,34 @@ jobs:
       - name: Test core logic
         run: swift test
 
-      - name: Build the menu bar app
+      - name: List Xcode schemes
         working-directory: App
         run: |
-          xcodebuild \
-            -scheme ThinkDial \
-            -destination 'platform=macOS' \
-            -configuration Release \
-            -derivedDataPath "$GITHUB_WORKSPACE/build" \
-            CODE_SIGNING_ALLOWED=NO \
-            ARCHS=arm64 \
-            ONLY_ACTIVE_ARCH=YES \
-            build
+          set +e
+          echo "===== xcodebuild -list (App/) ====="
+          xcodebuild -list
+          status=$?
+          echo "===== xcodebuild -list exit ${status} ====="
+          echo "The menu-bar app is built with swift build. This package directory does not get a ThinkDial scheme."
+          exit 0
 
-      - name: Package an ad-hoc signed app
+      - name: Build the menu bar app
         run: |
           set -euo pipefail
-          BIN=$(find "$GITHUB_WORKSPACE/build/Build/Products" -type f -name ThinkDial -not -path '*.dSYM/*' | head -n 1)
+          swift build -c release --arch arm64 --package-path App
+          BIN=$(find App/.build -type f -name ThinkDial -path '*/release/*' ! -path '*.dSYM/*' | head -n 1)
           echo "Binary: ${BIN}"
-          test -n "$BIN"
+          test -n "${BIN}"
+          file "${BIN}"
           chmod +x Scripts/package-app.sh
-          Scripts/package-app.sh "$BIN"
+          Scripts/package-app.sh "${BIN}"
+          test -d dist/ThinkDial.app/Contents/MacOS/ThinkDial
+          test -f dist/ThinkDial.app/Contents/Info.plist
+          echo "CFBundleIdentifier=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' dist/ThinkDial.app/Contents/Info.plist)"
+          echo "LSUIElement=$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' dist/ThinkDial.app/Contents/Info.plist)"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' dist/ThinkDial.app/Contents/Info.plist)" = "app.thinkdial.ThinkDial"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' dist/ThinkDial.app/Contents/Info.plist)" = "true"
+          codesign --verify --verbose=2 dist/ThinkDial.app
 
       - name: Upload the app zip
         uses: actions/upload-artifact@v4

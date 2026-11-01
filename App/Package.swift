@@ -16,30 +16,24 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "ThinkDialDDCSupport",
-            path: "Sources/ThinkDialDDCSupport",
+            name: "ThinkDialI2C",
+            path: "Sources/ThinkDialI2C",
             publicHeadersPath: "include",
             linkerSettings: [
-                .linkedFramework("CoreDisplay"),
-                .linkedFramework("IOKit")
+                .linkedFramework("IOKit"),
+                .linkedFramework("CoreFoundation"),
+                .linkedFramework("CoreGraphics")
             ]
         ),
         .executableTarget(
             name: "ThinkDial",
             dependencies: [
-                "ThinkDialDDCSupport",
+                "ThinkDialI2C",
                 .product(name: "ThinkDialCore", package: "ThinkDial"),
                 .product(name: "AppleSiliconDDC", package: "AppleSiliconDDC")
             ],
-            path: "Sources/ThinkDial",
-            linkerSettings: [
-                .linkedFramework("CoreDisplay"),
-                .linkedFramework("IOKit"),
-                .linkedFramework("CoreGraphics"),
-                .linkedFramework("ApplicationServices"),
-                .linkedFramework("AppKit"),
-                .linkedFramework("ServiceManagement")
-            ]
+            path: "Sources/ThinkDial"
         )
-    ]
+    ],
+    swiftLanguageVersions: [.v5]
 )

@@ -40,12 +40,15 @@ final class HardwareDDCBackend: DDCBackend, @unchecked Sendable {
     }
 
     func readCapabilities(display: DisplayID) async throws -> String? {
-        try await onQueue {
-            if AppleSiliconDDC.isArm64 {
-                guard let service = self.armServices[display.raw]?.service else { return nil }
-                return CapabilitiesTransport.readString(service: thinkDialServicePointer(service))
-            }
-            return self.intel.readCapabilities(display: display)
+        // AppleSiliconDDC's public API is get/set VCP. It does not expose the
+        // capabilities request (opcode 0xF3), and calling IOAVService ourselves
+        // depends on a private symbol. The probe scan is the Apple Silicon path.
+        // Intel can try a normal framebuffer I2C capabilities read.
+        if AppleSiliconDDC.isArm64 {
+            return nil
+        }
+        return try await onQueue {
+            self.intel.readCapabilities(display: display)
         }
     }
 
@@ -125,9 +128,9 @@ final class HardwareDDCBackend: DDCBackend, @unchecked Sendable {
         )
     }
 
-    private func onQueue<T>(_ body: @escaping () throws -> T) async throws -> T {
+    private func onQueue<T: Sendable>(_ body: @escaping @Sendable () throws -> T) async throws -> T {
         try await withCheckedThrowingContinuation { continuation in
-            queue.async {
+            self.queue.async {
                 do {
                     continuation.resume(returning: try body())
                 } catch {

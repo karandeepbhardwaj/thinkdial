@@ -231,7 +231,7 @@ private struct HotkeySettings: View {
         recording = action
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             if event.keyCode == 53 {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     recording = nil
                     if let monitor { NSEvent.removeMonitor(monitor) }
                     self.monitor = nil
@@ -241,7 +241,7 @@ private struct HotkeySettings: View {
             let modifiers = KeyCodeName.modifiers(from: event.modifierFlags)
             guard !modifiers.isEmpty else { return event }
             let binding = HotkeyBinding(action: action, keyCode: event.keyCode, modifiers: modifiers)
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 model.settings.hotkeys.removeAll { $0.action == action }
                 model.settings.hotkeys.append(binding)
                 model.save()
@@ -260,12 +260,17 @@ private struct ScheduleSettings: View {
 
     var body: some View {
         Form {
-            Picker("Brightness schedule", selection: $model.settings.scheduleMode) {
+            Picker("Brightness schedule", selection: Binding(
+                get: { model.settings.scheduleMode },
+                set: { mode in
+                    model.settings.scheduleMode = mode
+                    model.save()
+                }
+            )) {
                 Text("Off").tag(ScheduleMode.off)
                 Text("Time of day").tag(ScheduleMode.clock)
                 Text("Sunrise and sunset").tag(ScheduleMode.solar)
             }
-            .onChange(of: model.settings.scheduleMode) { _ in model.save() }
 
             Text("After you move the brightness slider, the schedule waits \(Int(model.settings.scheduleHoldoffSeconds)) seconds before it takes over again.")
                 .font(.caption)

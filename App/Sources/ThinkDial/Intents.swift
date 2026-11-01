@@ -107,10 +107,17 @@ struct PowerOffDisplayIntent: AppIntent {
     static var description = IntentDescription("Writes the MCCS power-off value. The panel may not wake over DDC.")
     static var openAppWhenRun = true
 
-    func perform() async throws -> some IntentResult {
-        try await requestConfirmation()
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        // The no-argument requestConfirmation() is easy to make ambiguous against the
+        // later overloads. This one has been the stable dialog form since macOS 15.
+        if #available(macOS 15.0, *) {
+            try await requestConfirmation(
+                actionName: .`continue`,
+                dialog: IntentDialog("Turn the ThinkVision off? This writes VCP 0xD6 = 0x05. DDC often cannot wake the panel.")
+            )
+        }
         try await AppModel.shared.writeNow(code: PowerMapping.code, value: PowerMapping.off)
-        return .result()
+        return .result(dialog: "Sent power off.")
     }
 }
 
